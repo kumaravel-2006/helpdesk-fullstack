@@ -1,0 +1,222 @@
+package com.helpdesk.service;
+
+import com.helpdesk.dto.*;
+import com.helpdesk.entity.*;
+import com.helpdesk.exception.ApiException;
+import com.helpdesk.repository.*;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.stream.Collectors;
+
+@Service
+@RequiredArgsConstructor
+public class TicketService {
+
+    private final TicketRepository ticketRepository;
+    private final SubCategoryRepository subCategoryRepository;
+    private final UserRepository userRepository;
+    private final NotificationService notificationService;
+
+    private static final Set<TicketStatus> TERMINAL = Set.of(
+            TicketStatus.CLOSED, TicketStatus.REJECTED, TicketStatus.CANCELLED);
+
+    public TicketResponse createTicket(User student, CreateTicketRequest request) {
+        SubCategory subCategory = subCategoryRepository.findById(request.getSubCategoryId())
+                .orElseThrow(() -> new ApiException("Unknown sub-category", HttpStatus.BAD_REQUEST));
+
+        TicketLocation location = TicketLocation.builder()
+                .locationType(request.getLocationType())
+                .buildingOrHostelName(request.getBuildingOrHostelName())
+                .block(request.getBlock())
+                .floor(request.getFloor())
+                .roomOrArea(request.getRoomOrArea())
+                .build();
+
+        Ticket ticket = Ticket.builder()
+                .ticketCode(generateTicketCode())
+                .student(student)
+                .subCategory(subCategory)
+                .location(location)
+                .description(request.getDescription())
+                .priority(request.getPriority() != null ? request.getPriority() : Priority.NORMAL)
+                .status(TicketStatus.OPEN)
+                .preferredDate(request.getPreferredDate())
+                .preferredTimeSlot(request.getPreferredTimeSlot())
+                .permissionToEnterRoom(request.isPermissionToEnterRoom())
+                .build();
+
+        if (request.getImageUrls() != null) {
+            if (ticket.getImages() == null) {
+                ticket.setImages(new ArrayList<>());
+            }
+            for (String url : request.getImageUrls()) {
+                ticket.getImages().add(TicketImage.builder()
+                        .ticket(ticket)
+                        .url(url)
+                        .stage("REPORTED")
+                        .build());
+            }
+        }
+
+        Ticket savedTicket = ticketRepository.save(ticket);
+        return toResponse(savedTicket);
+    }
+
+    public List<TicketResponse> getTicketsForStudent(Long studentId) {
+        return ticketRepository.findByStudentIdOrderByCreatedAtDesc(studentId)
+                .stream().map(this::toResponse).collect(Collectors.toList());
+    }
+
+    public List<TicketResponse> getTicketsForWorker(Long workerId) {
+        return ticketRepository.findByAssignedWorkerIdOrderByCreatedAtDesc(workerId)
+                .stream().map(this::toResponse).collect(Collectors.toList());
+    }
+
+    public List<TicketResponse> getAllTickets() {
+        return ticketRepository.findTop50ByOrderByCreatedAtDesc()
+                .stream().map(this::toResponse).collect(Collectors.toList());
+    }
+
+    public TicketResponse getTicketByCode(String ticketCode) {
+        return toResponse(findByCode(ticketCode));
+    }
+
+    public TicketResponse assignWorker(String ticketCode, AssignWorkerRequest request) {
+        Ticket ticket = findByCode(ticketCode);
+        User worker = userRepository.findById(request.getWorkerId())
+                .orElseThrow(() -> new ApiException("Worker not found", HttpStatus.NOT_FOUND));
+
+        if (worker.getRole() != Role.WORKER) {
+            throw new ApiException("Selected user is not a WORKER", HttpStatus.BAD_REQUEST);
+        }
+
+        ticket.setAssignedWorker(worker);
+        ticket.setStatus(TicketStatus.ASSIGNED);
+        ticket.setAssignedAt(LocalDateTime.now());
+        if (request.getPriority() != null) {
+            ticket.setPriority(request.getPriority());
+        }
+        if (request.getExpectedCompletionAt() != null) {
+            ticket.setExpectedCompletionAt(LocalDateTime.parse(request.getExpectedCompletionAt()));
+        }
+
+        ticket = ticketRepository.save(ticket);
+
+        notify(ticket, worker.getId(), "You have been assigned ticket " + ticket.getTicketCode());
+        notify(ticket, ticket.getStudent().getId(), "Your ticket " + ticket.getTicketCode() + " has been assigned to a worker");
+
+        return toResponse(ticket);
+    }
+
+    public TicketResponse updateStatus(String ticketCode, UpdateStatusRequest request, User actor) {
+        Ticket ticket = findByCode(ticketCode);
+
+        if (TERMINAL.contains(ticket.getStatus()) && request.getStatus() != TicketStatus.REOPENED) {
+            throw new ApiException("Ticket is already in a terminal state: " + ticket.getStatus(), HttpStatus.BAD_REQUEST);
+        }
+
+        ticket.setStatus(request.getStatus());
+
+        switch (request.getStatus()) {
+            case RESOLVED -> ticket.setResolvedAt(LocalDateTime.now());
+            case CLOSED -> ticket.setClosedAt(LocalDateTime.now());
+            default -> { /* no timestamp side-effect */ }
+        }
+
+        if (request.getNote() != null && !request.getNote().isBlank()) {
+            if (request.getStatus() == TicketStatus.RESOLVED) {
+                ticket.setResolutionNotes(request.getNote());
+            }
+            ticket.getNotes().add(TicketNote.builder()
+                    .ticket(ticket)
+                    .author(actor)
+                    .content(request.getNote())
+                    .internal(actor.getRole() != Role.STUDENT)
+                    .build());
+        }
+
+        ticket = ticketRepository.save(ticket);
+
+        Long notifyRecipient = actor.getRole() == Role.STUDENT
+                ? (ticket.getAssignedWorker() != null ? ticket.getAssignedWorker().getId() : null)
+                : ticket.getStudent().getId();
+
+        if (notifyRecipient != null) {
+            notify(ticket, notifyRecipient, "Ticket " + ticket.getTicketCode() + " status changed to " + ticket.getStatus());
+        }
+
+        return toResponse(ticket);
+    }
+
+    public DashboardStats getDashboardStats() {
+        return DashboardStats.builder()
+                .open(ticketRepository.countByStatus(TicketStatus.OPEN))
+                .assigned(ticketRepository.countByStatus(TicketStatus.ASSIGNED))
+                .inProgress(ticketRepository.countByStatus(TicketStatus.IN_PROGRESS))
+                .resolved(ticketRepository.countByStatus(TicketStatus.RESOLVED))
+                .closed(ticketRepository.countByStatus(TicketStatus.CLOSED))
+                .escalated(ticketRepository.countByStatus(TicketStatus.ESCALATED))
+                .build();
+    }
+
+    private Ticket findByCode(String ticketCode) {
+        return ticketRepository.findByTicketCode(ticketCode)
+                .orElseThrow(() -> new ApiException("Ticket not found: " + ticketCode, HttpStatus.NOT_FOUND));
+    }
+
+    private void notify(Ticket ticket, Long recipientId, String message) {
+        notificationService.publishTicketEvent(TicketEvent.builder()
+                .ticketId(ticket.getId())
+                .ticketCode(ticket.getTicketCode())
+                .status(ticket.getStatus())
+                .recipientUserId(recipientId)
+                .message(message)
+                .build());
+    }
+
+    private String generateTicketCode() {
+        int suffix = ThreadLocalRandom.current().nextInt(10000, 99999);
+        String candidate = "HD" + suffix;
+        // avoid the (rare) collision rather than relying on a DB sequence, to keep the scaffold simple
+        while (ticketRepository.findByTicketCode(candidate).isPresent()) {
+            candidate = "HD" + ThreadLocalRandom.current().nextInt(10000, 99999);
+        }
+        return candidate;
+    }
+
+    private TicketResponse toResponse(Ticket t) {
+        return TicketResponse.builder()
+                .id(t.getId())
+                .ticketCode(t.getTicketCode())
+                .studentName(t.getStudent().getFullName())
+                .categoryName(t.getSubCategory() != null ? t.getSubCategory().getCategory().getName() : null)
+                .subCategoryName(t.getSubCategory() != null ? t.getSubCategory().getName() : null)
+                .locationSummary(t.getLocation() != null ? formatLocation(t.getLocation()) : null)
+                .description(t.getDescription())
+                .priority(t.getPriority())
+                .status(t.getStatus())
+                .preferredDate(t.getPreferredDate())
+                .preferredTimeSlot(t.getPreferredTimeSlot())
+                .assignedWorkerName(t.getAssignedWorker() != null ? t.getAssignedWorker().getFullName() : null)
+                .createdAt(t.getCreatedAt())
+                .updatedAt(t.getUpdatedAt())
+                .resolutionNotes(t.getResolutionNotes())
+                .imageUrls(t.getImages().stream().map(TicketImage::getUrl).collect(Collectors.toList()))
+                .build();
+    }
+
+    private String formatLocation(TicketLocation loc) {
+        StringBuilder sb = new StringBuilder(loc.getBuildingOrHostelName());
+        if (loc.getBlock() != null && !loc.getBlock().isBlank()) sb.append(" - Block ").append(loc.getBlock());
+        if (loc.getFloor() != null && !loc.getFloor().isBlank()) sb.append(" - Floor ").append(loc.getFloor());
+        sb.append(" - ").append(loc.getRoomOrArea());
+        return sb.toString();
+    }
+}
