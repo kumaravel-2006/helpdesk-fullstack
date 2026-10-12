@@ -31,8 +31,8 @@ public class AuthService {
         if (userRepository.existsByEmail(request.getEmail())) {
             throw new ApiException("Email is already registered", HttpStatus.CONFLICT);
         }
-        if (request.getRole() == Role.ADMIN || request.getRole() == Role.MANAGER) {
-            throw new ApiException("MANAGER/ADMIN accounts must be created by an existing admin", HttpStatus.FORBIDDEN);
+        if (request.getRole() == Role.ADMIN) {
+            throw new ApiException("ADMIN accounts must be created by an existing admin", HttpStatus.FORBIDDEN);
         }
 
         User user = User.builder()

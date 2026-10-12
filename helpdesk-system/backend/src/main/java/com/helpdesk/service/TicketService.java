@@ -7,6 +7,7 @@ import com.helpdesk.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -27,6 +28,7 @@ public class TicketService {
     private static final Set<TicketStatus> TERMINAL = Set.of(
             TicketStatus.CLOSED, TicketStatus.REJECTED, TicketStatus.CANCELLED);
 
+    @Transactional
     public TicketResponse createTicket(User student, CreateTicketRequest request) {
         SubCategory subCategory = subCategoryRepository.findById(request.getSubCategoryId())
                 .orElseThrow(() -> new ApiException("Unknown sub-category", HttpStatus.BAD_REQUEST));
@@ -69,25 +71,30 @@ public class TicketService {
         return toResponse(savedTicket);
     }
 
+    @Transactional(readOnly = true)
     public List<TicketResponse> getTicketsForStudent(Long studentId) {
         return ticketRepository.findByStudentIdOrderByCreatedAtDesc(studentId)
                 .stream().map(this::toResponse).collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public List<TicketResponse> getTicketsForWorker(Long workerId) {
         return ticketRepository.findByAssignedWorkerIdOrderByCreatedAtDesc(workerId)
                 .stream().map(this::toResponse).collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public List<TicketResponse> getAllTickets() {
         return ticketRepository.findTop50ByOrderByCreatedAtDesc()
                 .stream().map(this::toResponse).collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public TicketResponse getTicketByCode(String ticketCode) {
         return toResponse(findByCode(ticketCode));
     }
 
+    @Transactional
     public TicketResponse assignWorker(String ticketCode, AssignWorkerRequest request) {
         Ticket ticket = findByCode(ticketCode);
         User worker = userRepository.findById(request.getWorkerId())
@@ -115,6 +122,7 @@ public class TicketService {
         return toResponse(ticket);
     }
 
+    @Transactional
     public TicketResponse updateStatus(String ticketCode, UpdateStatusRequest request, User actor) {
         Ticket ticket = findByCode(ticketCode);
 
@@ -195,8 +203,9 @@ public class TicketService {
         return TicketResponse.builder()
                 .id(t.getId())
                 .ticketCode(t.getTicketCode())
-                .studentName(t.getStudent().getFullName())
-                .categoryName(t.getSubCategory() != null ? t.getSubCategory().getCategory().getName() : null)
+                .studentName(t.getStudent() != null ? t.getStudent().getFullName() : null)
+                .categoryName(t.getSubCategory() != null && t.getSubCategory().getCategory() != null 
+                        ? t.getSubCategory().getCategory().getName() : null)
                 .subCategoryName(t.getSubCategory() != null ? t.getSubCategory().getName() : null)
                 .locationSummary(t.getLocation() != null ? formatLocation(t.getLocation()) : null)
                 .description(t.getDescription())
@@ -208,15 +217,18 @@ public class TicketService {
                 .createdAt(t.getCreatedAt())
                 .updatedAt(t.getUpdatedAt())
                 .resolutionNotes(t.getResolutionNotes())
-                .imageUrls(t.getImages().stream().map(TicketImage::getUrl).collect(Collectors.toList()))
+                .imageUrls(t.getImages() != null 
+                        ? t.getImages().stream().map(TicketImage::getUrl).collect(Collectors.toList()) 
+                        : List.of())
                 .build();
     }
 
     private String formatLocation(TicketLocation loc) {
-        StringBuilder sb = new StringBuilder(loc.getBuildingOrHostelName());
+        if (loc == null) return null;
+        StringBuilder sb = new StringBuilder(loc.getBuildingOrHostelName() != null ? loc.getBuildingOrHostelName() : "");
         if (loc.getBlock() != null && !loc.getBlock().isBlank()) sb.append(" - Block ").append(loc.getBlock());
         if (loc.getFloor() != null && !loc.getFloor().isBlank()) sb.append(" - Floor ").append(loc.getFloor());
-        sb.append(" - ").append(loc.getRoomOrArea());
+        if (loc.getRoomOrArea() != null && !loc.getRoomOrArea().isBlank()) sb.append(" - ").append(loc.getRoomOrArea());
         return sb.toString();
     }
 }

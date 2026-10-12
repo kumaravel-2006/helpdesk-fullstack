@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import api from "../api/axios.js";
 import StatusPill from "../components/StatusPill.jsx";
@@ -7,11 +7,42 @@ export default function ManagerDashboard() {
   const [stats, setStats] = useState(null);
   const [tickets, setTickets] = useState([]);
   const [statusFilter, setStatusFilter] = useState("ALL");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  const loadData = useCallback(() => {
+    setLoading(true);
+    setError("");
+
+    Promise.allSettled([
+      api.get("/dashboard/stats"),
+      api.get("/tickets")
+    ]).then(([statsRes, ticketsRes]) => {
+      if (statsRes.status === "fulfilled") {
+        setStats(statsRes.value.data);
+      } else {
+        console.error("Failed to load dashboard stats:", statsRes.reason);
+      }
+
+      if (ticketsRes.status === "fulfilled") {
+        setTickets(ticketsRes.value.data);
+      } else {
+        const status = ticketsRes.reason?.response?.status;
+        const msg = ticketsRes.reason?.response?.data?.message;
+        if (status === 403) {
+          setError("Access forbidden. Please verify you are signed in with a MANAGER account.");
+        } else {
+          setError(msg || "Could not load tickets from the server.");
+        }
+      }
+    }).finally(() => {
+      setLoading(false);
+    });
+  }, []);
 
   useEffect(() => {
-    api.get("/dashboard/stats").then((res) => setStats(res.data));
-    api.get("/tickets").then((res) => setTickets(res.data));
-  }, []);
+    loadData();
+  }, [loadData]);
 
   const visible = statusFilter === "ALL" ? tickets : tickets.filter((t) => t.status === statusFilter);
 
@@ -22,7 +53,12 @@ export default function ManagerDashboard() {
           <h1>Manager dashboard</h1>
           <p>All complaints across hostels and campus buildings.</p>
         </div>
+        <button className="btn btn-secondary" onClick={loadData} disabled={loading}>
+          {loading ? "Refreshing..." : "Refresh"}
+        </button>
       </div>
+
+      {error && <div className="error-box">{error}</div>}
 
       {stats && (
         <div className="stat-row">
@@ -38,15 +74,19 @@ export default function ManagerDashboard() {
       <div className="field-group" style={{ maxWidth: 220 }}>
         <label>Filter by status</label>
         <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-          <option value="ALL">All</option>
+          <option value="ALL">All ({tickets.length})</option>
           {["OPEN", "ASSIGNED", "ACCEPTED", "IN_PROGRESS", "RESOLVED", "CONFIRMED", "CLOSED", "ESCALATED", "REJECTED", "CANCELLED", "REOPENED"].map((s) => (
             <option key={s} value={s}>{s.replace("_", " ")}</option>
           ))}
         </select>
       </div>
 
-      {visible.length === 0 ? (
-        <div className="empty-state">No tickets match this filter.</div>
+      {loading ? (
+        <p>Loading tickets...</p>
+      ) : visible.length === 0 ? (
+        <div className="empty-state">
+          {tickets.length === 0 ? "No complaints have been submitted yet." : "No tickets match this filter."}
+        </div>
       ) : (
         <div>
           {visible.map((t) => (

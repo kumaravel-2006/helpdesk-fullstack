@@ -1,22 +1,28 @@
 package com.helpdesk.config;
 
 import com.helpdesk.entity.Category;
+import com.helpdesk.entity.Role;
 import com.helpdesk.entity.SubCategory;
+import com.helpdesk.entity.User;
 import com.helpdesk.repository.CategoryRepository;
+import com.helpdesk.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
 
 /**
- * Seeds help topics from the campus helpdesk spec on boot.
+ * Seeds help topics and default system users from the campus helpdesk spec on boot.
  */
 @Component
 @RequiredArgsConstructor
 public class DataSeeder implements CommandLineRunner {
 
     private final CategoryRepository categoryRepository;
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
 
     public static final List<String> HELP_TOPICS = List.of(
             "AC-Problem",
@@ -61,6 +67,11 @@ public class DataSeeder implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
+        seedCategories();
+        seedUsers();
+    }
+
+    private void seedCategories() {
         if (categoryRepository.count() >= HELP_TOPICS.size()) {
             return;
         }
@@ -81,6 +92,49 @@ public class DataSeeder implements CommandLineRunner {
             );
 
             categoryRepository.save(category);
+        }
+    }
+
+    private void seedUsers() {
+        if (!userRepository.existsByEmail("manager@ssn.edu.in")) {
+            userRepository.save(User.builder()
+                    .fullName("Campus Manager")
+                    .email("manager@ssn.edu.in")
+                    .phoneNumber("9876543210")
+                    .passwordHash(passwordEncoder.encode("Password123!"))
+                    .role(Role.MANAGER)
+                    .build());
+        }
+
+        if (!userRepository.existsByEmail("admin@ssn.edu.in")) {
+            userRepository.save(User.builder()
+                    .fullName("System Admin")
+                    .email("admin@ssn.edu.in")
+                    .phoneNumber("9876543211")
+                    .passwordHash(passwordEncoder.encode("Password123!"))
+                    .role(Role.ADMIN)
+                    .build());
+        }
+
+        if (!userRepository.existsByEmail("worker@ssn.edu.in")) {
+            userRepository.save(User.builder()
+                    .fullName("Ramesh Worker")
+                    .email("worker@ssn.edu.in")
+                    .phoneNumber("9876543212")
+                    .passwordHash(passwordEncoder.encode("Password123!"))
+                    .role(Role.WORKER)
+                    .specialization("General")
+                    .build());
+        }
+
+        if (!userRepository.existsByEmail("student@ssn.edu.in")) {
+            userRepository.save(User.builder()
+                    .fullName("Arun Student")
+                    .email("student@ssn.edu.in")
+                    .phoneNumber("9876543213")
+                    .passwordHash(passwordEncoder.encode("Password123!"))
+                    .role(Role.STUDENT)
+                    .build());
         }
     }
 }

@@ -60,11 +60,12 @@ public class SecurityConfig {
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
+                    .requestMatchers("/", "/error").permitAll()
                 .requestMatchers("/api/auth/**").permitAll()
                 .requestMatchers("/api/public/**").permitAll()
                 .requestMatchers("/actuator/health").permitAll()
                 .requestMatchers("/api/categories/**").authenticated()
-                .requestMatchers("/api/tickets/**").authenticated()
+                .requestMatchers("/api/tickets", "/api/tickets/**").authenticated()
                 .requestMatchers("/api/users/**").hasAnyRole("ADMIN", "MANAGER")
                 .requestMatchers("/api/dashboard/**").hasAnyRole("MANAGER", "ADMIN")
                 .anyRequest().authenticated()
