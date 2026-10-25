@@ -74,7 +74,7 @@ export default function TicketDetail() {
 
   const roleActions = user.role === "STUDENT" ? STUDENT_ACTIONS
     : user.role === "WORKER" ? WORKER_ACTIONS
-    : MANAGER_ACTIONS;
+      : MANAGER_ACTIONS;
   const availableActions = roleActions[ticket.status] || [];
 
   return (
@@ -122,7 +122,7 @@ export default function TicketDetail() {
                 ))}
               </select>
               <button className="btn btn-primary" style={{ marginTop: 10 }} disabled={busy || !selectedWorker}
-                      onClick={assignWorker}>
+                onClick={assignWorker}>
                 Assign
               </button>
             </div>
@@ -132,11 +132,11 @@ export default function TicketDetail() {
             <div className="field-group">
               <label>Add a note (optional)</label>
               <textarea value={note} onChange={(e) => setNote(e.target.value)}
-                        placeholder="What changed / resolution details..." />
+                placeholder="What changed / resolution details..." />
               <div style={{ display: "flex", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
                 {availableActions.map((action) => (
                   <button key={action} className="btn btn-secondary" disabled={busy}
-                          onClick={() => changeStatus(action)}>
+                    onClick={() => changeStatus(action)}>
                     Mark as {action.replace("_", " ").toLowerCase()}
                   </button>
                 ))}

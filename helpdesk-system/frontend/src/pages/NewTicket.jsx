@@ -79,14 +79,14 @@ export default function NewTicket() {
 
   const topics = categories.length > 0
     ? categories.flatMap((cat) => {
-        if (cat.subCategories && cat.subCategories.length > 0) {
-          return cat.subCategories.map((sub) => ({
-            id: sub.id,
-            name: sub.name,
-          }));
-        }
-        return [{ id: cat.id, name: cat.name }];
-      })
+      if (cat.subCategories && cat.subCategories.length > 0) {
+        return cat.subCategories.map((sub) => ({
+          id: sub.id,
+          name: sub.name,
+        }));
+      }
+      return [{ id: cat.id, name: cat.name }];
+    })
     : DEFAULT_HELP_TOPICS;
 
   async function handleSubmit(e) {
@@ -119,7 +119,7 @@ export default function NewTicket() {
         <div className="field-group">
           <label>Where is the problem?</label>
           <select value={form.locationType}
-                  onChange={(e) => setForm({ ...form, locationType: e.target.value })}>
+            onChange={(e) => setForm({ ...form, locationType: e.target.value })}>
             <option value="HOSTEL">Hostel</option>
             <option value="ACADEMIC_BUILDING">Academic / campus building</option>
           </select>
@@ -129,8 +129,8 @@ export default function NewTicket() {
           <div className="field-group">
             <label>{form.locationType === "HOSTEL" ? "Hostel name" : "Building name"}</label>
             <input required value={form.buildingOrHostelName}
-                   onChange={(e) => setForm({ ...form, buildingOrHostelName: e.target.value })}
-                   placeholder={form.locationType === "HOSTEL" ? "Boys Hostel A" : "IT Block"} />
+              onChange={(e) => setForm({ ...form, buildingOrHostelName: e.target.value })}
+              placeholder={form.locationType === "HOSTEL" ? "Boys Hostel A" : "IT Block"} />
           </div>
           <div className="field-group">
             <label>Block (optional)</label>
@@ -146,8 +146,8 @@ export default function NewTicket() {
           <div className="field-group">
             <label>Room / area</label>
             <input required value={form.roomOrArea}
-                   onChange={(e) => setForm({ ...form, roomOrArea: e.target.value })}
-                   placeholder={form.locationType === "HOSTEL" ? "B204" : "Lab 302"} />
+              onChange={(e) => setForm({ ...form, roomOrArea: e.target.value })}
+              placeholder={form.locationType === "HOSTEL" ? "B204" : "Lab 302"} />
           </div>
         </div>
 
@@ -155,7 +155,7 @@ export default function NewTicket() {
           <div className="field-group">
             <label>Problem type</label>
             <select required value={form.subCategoryId}
-                    onChange={(e) => setForm({ ...form, subCategoryId: e.target.value })}>
+              onChange={(e) => setForm({ ...form, subCategoryId: e.target.value })}>
               <option value="">— Select a Help Topic —</option>
               {topics.map((topic) => (
                 <option key={topic.id} value={topic.id}>{topic.name}</option>
@@ -176,20 +176,20 @@ export default function NewTicket() {
         <div className="field-group">
           <label>Describe the issue</label>
           <textarea required value={form.description}
-                    onChange={(e) => setForm({ ...form, description: e.target.value })}
-                    placeholder="Ceiling fan is not rotating since yesterday." />
+            onChange={(e) => setForm({ ...form, description: e.target.value })}
+            placeholder="Ceiling fan is not rotating since yesterday." />
         </div>
 
         <div className="field-row">
           <div className="field-group">
             <label>Preferred date</label>
             <input type="date" value={form.preferredDate}
-                   onChange={(e) => setForm({ ...form, preferredDate: e.target.value })} />
+              onChange={(e) => setForm({ ...form, preferredDate: e.target.value })} />
           </div>
           <div className="field-group">
             <label>Preferred time</label>
             <select value={form.preferredTimeSlot}
-                    onChange={(e) => setForm({ ...form, preferredTimeSlot: e.target.value })}>
+              onChange={(e) => setForm({ ...form, preferredTimeSlot: e.target.value })}>
               {TIME_SLOTS.map((slot) => <option key={slot} value={slot}>{slot}</option>)}
             </select>
           </div>
@@ -199,8 +199,8 @@ export default function NewTicket() {
           <div className="field-group">
             <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <input type="checkbox" style={{ width: "auto" }}
-                     checked={form.permissionToEnterRoom}
-                     onChange={(e) => setForm({ ...form, permissionToEnterRoom: e.target.checked })} />
+                checked={form.permissionToEnterRoom}
+                onChange={(e) => setForm({ ...form, permissionToEnterRoom: e.target.checked })} />
               Worker has permission to enter the room if I'm not present
             </label>
           </div>

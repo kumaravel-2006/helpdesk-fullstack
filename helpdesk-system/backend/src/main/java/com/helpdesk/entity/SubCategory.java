@@ -17,7 +17,7 @@ public class SubCategory {
     private Long id;
 
     @Column(nullable = false)
-    private String name; // e.g. "Fan not working"
+    private String name;
 
     @ManyToOne
     @JoinColumn(name = "category_id", nullable = false)

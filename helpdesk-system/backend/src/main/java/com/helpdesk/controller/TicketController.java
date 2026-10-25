@@ -23,7 +23,7 @@ public class TicketController {
     @PostMapping
     @PreAuthorize("hasRole('STUDENT')")
     public TicketResponse create(@AuthenticationPrincipal UserPrincipal principal,
-                                  @Valid @RequestBody CreateTicketRequest request) {
+            @Valid @RequestBody CreateTicketRequest request) {
         return ticketService.createTicket(principal.getUser(), request);
     }
 
@@ -54,8 +54,8 @@ public class TicketController {
 
     @PatchMapping("/{ticketCode}/status")
     public TicketResponse updateStatus(@PathVariable String ticketCode,
-                                        @Valid @RequestBody UpdateStatusRequest request,
-                                        @AuthenticationPrincipal UserPrincipal principal) {
+            @Valid @RequestBody UpdateStatusRequest request,
+            @AuthenticationPrincipal UserPrincipal principal) {
         return ticketService.updateStatus(ticketCode, request, principal.getUser());
     }
 }

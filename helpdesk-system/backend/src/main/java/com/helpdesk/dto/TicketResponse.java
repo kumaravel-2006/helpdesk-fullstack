@@ -7,11 +7,16 @@ import lombok.*;
 import java.time.LocalDateTime;
 import java.util.List;
 
-@Getter @Setter @Builder @NoArgsConstructor @AllArgsConstructor
+@Getter
+@Setter
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class TicketResponse {
     private Long id;
     private String ticketCode;
     private String studentName;
+    private Long studentId;
     private String categoryName;
     private String subCategoryName;
     private String locationSummary;
@@ -21,6 +26,7 @@ public class TicketResponse {
     private String preferredDate;
     private String preferredTimeSlot;
     private String assignedWorkerName;
+    private Long assignedWorkerId;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private String resolutionNotes;
